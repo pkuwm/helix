@@ -21,12 +21,17 @@ package org.apache.helix;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.zookeeper.Op;
+import org.apache.zookeeper.OpResult;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +91,11 @@ public class GroupCommit {
 
   public boolean commit(BaseDataAccessor<ZNRecord> accessor, int options, String key,
       ZNRecord record, boolean removeIfEmpty) {
+    return commit(accessor, options, key, record, removeIfEmpty, null);
+  }
+
+  public boolean commit(BaseDataAccessor<ZNRecord> accessor, int options, String key,
+      ZNRecord record, boolean removeIfEmpty, Message message) {
     Queue queue = getQueue(key);
     Entry entry = new Entry(key, record);
 
@@ -106,10 +116,11 @@ public class GroupCommit {
 
           String mergedKey = first._key;
           ZNRecord merged = null;
+          Stat stat = new Stat();
 
           try {
             // accessor will fallback to zk if not found in cache
-            merged = accessor.get(mergedKey, null, options);
+            merged = accessor.get(mergedKey, stat, options);
           } catch (ZkNoNodeException e) {
             // OK.
           }
@@ -138,15 +149,37 @@ public class GroupCommit {
           int retry = 0;
           success = false;
           while (++retry <= MAX_RETRY && !success) {
+            LOG.error(" ======== stat: {}", stat);
             if (removeIfEmpty && merged.getMapFields().isEmpty()) {
-              success = accessor.remove(mergedKey, options);
-              if (!success) {
-                LOG.error("Fails to remove " + mergedKey + " from ZK, retry it!");
-              } else {
-                LOG.info("Removed " + mergedKey);
-              }
+              LOG.error("====== removing.... ");
+              List<Op> ops = new ArrayList<>();
+              Stat msgStat = accessor.getStat(message.getPath(), AccessOption.PERSISTENT);
+              ops.add(Op.delete(mergedKey, stat.getVersion()));
+              ops.add(Op.delete(message.getPath(), msgStat.getVersion()));
+              LOG.error("==== before exists: {}", accessor.getZkClient().exists(message.getPath()));
+              List<OpResult> results = accessor.getZkClient().multi(ops);
+              LOG.error("==== after exists: {}", accessor.getZkClient().exists(message.getPath()));
+              success = true;
+//              success = accessor.remove(mergedKey, options);
+//              if (!success) {
+//                LOG.error("Fails to remove " + mergedKey + " from ZK, retry it!");
+//              } else {
+//                LOG.info("Removed " + mergedKey);
+//              }
             } else {
-              success = accessor.set(mergedKey, merged, options);
+              if (mergedKey.contains("CURRENTSTATES") && message != null) {
+                LOG.error("====== set: {}, {}", mergedKey, message.getPath());
+                List<Op> ops = new ArrayList<>();
+                Stat msgStat = accessor.getStat(message.getPath(), AccessOption.PERSISTENT);
+                ops.add(Op.setData(mergedKey, accessor.getZkClient().serialize(merged, mergedKey), stat.getVersion()));
+                ops.add(Op.delete(message.getPath(), msgStat.getVersion()));
+                LOG.error("==== before exists: {}", accessor.getZkClient().exists(message.getPath()));
+                List<OpResult> results = accessor.getZkClient().multi(ops);
+                LOG.error("==== after exists: {}", accessor.getZkClient().exists(message.getPath()));
+                success = true;
+              } else{
+                success = accessor.set(mergedKey, merged, options);
+              }
               if (!success) {
                 LOG.error("Fails to update " + mergedKey + " to ZK, retry it! ");
               }

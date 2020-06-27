@@ -21,6 +21,7 @@ package org.apache.helix;
 
 import java.util.List;
 
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.zkclient.DataUpdater;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
@@ -131,6 +132,10 @@ public interface BaseDataAccessor<T> {
    * @return the record data stored at the ZNode
    */
   T get(String path, Stat stat, int options);
+
+  default RealmAwareZkClient getZkClient() {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Get List of {@link T} corresponding to the paths using async api

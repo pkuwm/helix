@@ -38,10 +38,6 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.NotificationContext.MapKey;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.ZNRecordBucketizer;
-import org.apache.helix.zookeeper.datamodel.ZNRecordDelta;
-import org.apache.helix.zookeeper.datamodel.ZNRecordDelta.MergeOperation;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.Message.Attributes;
@@ -50,6 +46,10 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelParser;
 import org.apache.helix.participant.statemachine.StateTransitionError;
 import org.apache.helix.util.StatusUpdateUtil;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecordBucketizer;
+import org.apache.helix.zookeeper.datamodel.ZNRecordDelta;
+import org.apache.helix.zookeeper.datamodel.ZNRecordDelta.MergeOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,6 +146,7 @@ public class HelixStateTransitionHandler extends MessageHandler {
     try {
       String instance = _manager.getInstanceName();
       String sessionId = _message.getTgtSessionId();
+      _message.setPath(_message.getKey(accessor.keyBuilder(), instance).getPath());
       String resource = _message.getResourceName();
       ZNRecordBucketizer bucketizer = new ZNRecordBucketizer(_message.getBucketSize());
       PropertyKey key = accessor.keyBuilder().currentState(instance, sessionId, resource,
@@ -179,6 +180,7 @@ public class HelixStateTransitionHandler extends MessageHandler {
   }
 
   void postHandleMessage() {
+    logger.error("====== post message: {}", _message.getMsgId());
     HelixTaskResult taskResult =
         (HelixTaskResult) _notificationContext.get(MapKey.HELIX_TASK_RESULT.toString());
     Exception exception = taskResult.getException();
@@ -279,7 +281,10 @@ public class HelixStateTransitionHandler extends MessageHandler {
           bucketizer.getBucketName(partitionKey));
       if (_message.getAttribute(Attributes.PARENT_MSG_ID) == null) {
         // normal message
-        if (!accessor.updateProperty(key, _currentStateDelta)) {
+        logger.error("===== update current states for msg {}, {}", _message.getMsgId(),
+            _message.getKey(accessor.keyBuilder(), instanceName).getPath());
+        _message.setPath(_message.getKey(accessor.keyBuilder(), instanceName).getPath());
+        if (!accessor.updateProperty(key, _currentStateDelta, _message)) {
           throw new HelixException("Fails to persist current state back to ZK for resource "
               + resource + " partition: " + _message.getPartitionName());
         }

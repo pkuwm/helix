@@ -480,6 +480,11 @@ public class ZkBaseDataAccessor<T> implements BaseDataAccessor<T> {
     return data;
   }
 
+  @Override
+  public RealmAwareZkClient getZkClient() {
+    return _zkClient;
+  }
+
   /**
    * async get
    */

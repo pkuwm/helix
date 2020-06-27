@@ -41,6 +41,7 @@ import org.apache.helix.model.MaintenanceSignal;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.PauseSignal;
 import org.apache.helix.model.StateModelDefinition;
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.ZNRecordAssembler;
 import org.apache.helix.zookeeper.datamodel.ZNRecordBucketizer;
@@ -178,7 +179,16 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
   }
 
   @Override
+  public <T extends HelixProperty> boolean updateProperty(PropertyKey key, T value, Message message) {
+    return updateProperty(key, new ZNRecordUpdater(value.getRecord()), value, message);
+  }
+
+  @Override
   public <T extends HelixProperty> boolean updateProperty(PropertyKey key, DataUpdater<ZNRecord> updater, T value) {
+    return updateProperty(key, updater, value, null);
+  }
+
+  public <T extends HelixProperty> boolean updateProperty(PropertyKey key, DataUpdater<ZNRecord> updater, T value, Message message) {
     PropertyType type = key.getType();
     String path = key.getPath();
     int options = constructOptions(type);
@@ -186,7 +196,7 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
     boolean success = false;
     switch (type) {
     case CURRENTSTATES:
-      success = _groupCommit.commit(_baseDataAccessor, options, path, value.getRecord(), true);
+      success = _groupCommit.commit(_baseDataAccessor, options, path, value.getRecord(), true, message);
       break;
     case STATUSUPDATES:
       if (LOG.isTraceEnabled()) {
@@ -198,6 +208,11 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
       break;
     }
     return success;
+  }
+
+  @Override
+  public RealmAwareZkClient getZkClient() {
+    return _baseDataAccessor.getZkClient();
   }
 
   @Deprecated

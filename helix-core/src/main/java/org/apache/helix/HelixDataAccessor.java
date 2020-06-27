@@ -27,6 +27,7 @@ import org.apache.helix.model.MaintenanceSignal;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.PauseSignal;
 import org.apache.helix.model.StateModelDefinition;
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.zkclient.DataUpdater;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
@@ -66,6 +67,10 @@ public interface HelixDataAccessor {
    */
   <T extends HelixProperty> boolean updateProperty(PropertyKey key, T value);
 
+  default <T extends HelixProperty> boolean updateProperty(PropertyKey key, T value, Message message) {
+    throw new UnsupportedOperationException();
+  }
+
   /**
    * Updates a property using specified updater
    * @param key
@@ -83,6 +88,10 @@ public interface HelixDataAccessor {
    * @return value, Null if absent or on error
    */
   <T extends HelixProperty> T getProperty(PropertyKey key);
+
+  default RealmAwareZkClient getZkClient() {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Return a list of property values, each of which must be refer to a single Helix

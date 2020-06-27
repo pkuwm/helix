@@ -172,6 +172,7 @@ public class TestP2PNoDuplicatedMessage extends ZkTestBase {
     }
 
     double ratio = ((double) p2pTrigged) / ((double) total);
+    System.out.println("===== ratio " + ratio);
     Assert.assertTrue(ratio > 0.6, String
        .format("Only %d out of %d percent transitions to Master were triggered by expected host!",
            p2pTrigged, total));

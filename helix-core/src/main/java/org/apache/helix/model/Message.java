@@ -97,7 +97,8 @@ public class Message extends HelixProperty {
     RELAY_TIME,
     RELAY_FROM,
     EXPIRY_PERIOD,
-    SRC_CLUSTER
+    SRC_CLUSTER,
+    PATH
   }
 
   /**
@@ -231,6 +232,14 @@ public class Message extends HelixProperty {
    */
   public String getTgtSessionId() {
     return _record.getSimpleField(Attributes.TGT_SESSION_ID.toString());
+  }
+
+  public String getPath() {
+    return _record.getSimpleField(Attributes.PATH.toString());
+  }
+
+  public void setPath(String path) {
+    _record.setSimpleField(Attributes.PATH.toString(), path);
   }
 
   /**
