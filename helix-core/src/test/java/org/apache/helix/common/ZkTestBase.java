@@ -44,8 +44,6 @@ import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.TestHelper;
-import org.apache.helix.zookeeper.impl.client.ZkClient;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.api.config.HelixConfigProperty;
 import org.apache.helix.controller.pipeline.AbstractAsyncBaseStage;
 import org.apache.helix.controller.pipeline.Pipeline;
@@ -60,8 +58,6 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.zookeeper.impl.factory.DedicatedZkClientFactory;
-import org.apache.helix.zookeeper.api.client.HelixZkClient;
 import org.apache.helix.model.BuiltInStateModelDefinitions;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ConfigScope;
@@ -78,6 +74,10 @@ import org.apache.helix.model.builder.ConfigScopeBuilder;
 import org.apache.helix.tools.ClusterSetup;
 import org.apache.helix.tools.ClusterStateVerifier;
 import org.apache.helix.tools.StateModelConfigGenerator;
+import org.apache.helix.zookeeper.api.client.HelixZkClient;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.impl.factory.DedicatedZkClientFactory;
 import org.apache.helix.zookeeper.zkclient.IZkStateListener;
 import org.apache.helix.zookeeper.zkclient.ZkConnection;
 import org.apache.helix.zookeeper.zkclient.ZkServer;
@@ -230,6 +230,17 @@ public class ZkTestBase {
     long startTime = System.currentTimeMillis();
     System.out.println("START " + testMethod.getName() + " at " + new Date(startTime));
     testContext.setAttribute("StartTime", System.currentTimeMillis());
+    // Get current size of heap in bytes
+    long heapSize = Runtime.getRuntime().totalMemory();
+
+// Get maximum size of heap in bytes. The heap cannot grow beyond this size.// Any attempt will
+// result in an OutOfMemoryException.
+    long heapMaxSize = Runtime.getRuntime().maxMemory();
+
+    // Get amount of free memory within the heap in bytes. This size will increase // after
+    // garbage collection and decrease as new objects are created.
+    long heapFreeSize = Runtime.getRuntime().freeMemory();
+    System.out.println("heapSize: " + heapSize + "; heapMaxSize: " + heapMaxSize + "; heapFreeSize: " + heapFreeSize);
   }
 
   @AfterMethod
@@ -238,6 +249,17 @@ public class ZkTestBase {
     long endTime = System.currentTimeMillis();
     System.out.println("END " + testMethod.getName() + " at " + new Date(endTime) + ", took: "
         + (endTime - startTime) + "ms.");
+    // Get current size of heap in bytes
+    long heapSize = Runtime.getRuntime().totalMemory();
+
+// Get maximum size of heap in bytes. The heap cannot grow beyond this size.// Any attempt will
+// result in an OutOfMemoryException.
+    long heapMaxSize = Runtime.getRuntime().maxMemory();
+
+    // Get amount of free memory within the heap in bytes. This size will increase // after
+    // garbage collection and decrease as new objects are created.
+    long heapFreeSize = Runtime.getRuntime().freeMemory();
+    System.out.println("heapSize: " + heapSize + "; heapMaxSize: " + heapMaxSize + "; heapFreeSize: " + heapFreeSize);
   }
 
   protected void cleanupJMXObjects() throws IOException {
