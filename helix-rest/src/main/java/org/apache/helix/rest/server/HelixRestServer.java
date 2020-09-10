@@ -26,10 +26,16 @@ import java.util.List;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 
+import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SharedMetricRegistries;
+import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
+import com.codahale.metrics.jmx.JmxReporter;
 import org.apache.helix.HelixException;
 import org.apache.helix.rest.common.ContextPropertyKeys;
 import org.apache.helix.rest.common.HelixRestNamespace;
 import org.apache.helix.rest.common.ServletType;
+import org.apache.helix.rest.metrics.HelixRestObjectNameFactory;
 import org.apache.helix.rest.server.auditlog.AuditLogger;
 import org.apache.helix.rest.server.filters.AuditLogFilter;
 import org.apache.helix.rest.server.filters.CORSFilter;
@@ -44,7 +50,6 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.server.ServerProperties;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,6 +138,9 @@ public class HelixRestServer {
     ResourceConfig config = getResourceConfig(namespace, type);
     _resourceConfigMap.put(resourceConfigMapKey, config);
 
+    // Init metric registry for this servlet.
+    initMetricRegistry(config, namespace.getName());
+
     // Initialize servlet
     initServlet(config, String.format(type.getServletPathSpecTemplate(), namespace.getName()));
   }
@@ -147,7 +155,7 @@ public class HelixRestServer {
     cfg.setApplicationName(namespace.getName());
 
     // Enable the default statistical monitoring MBean for Jersey server
-    cfg.property(ServerProperties.MONITORING_STATISTICS_MBEANS_ENABLED, true);
+//    cfg.property(ServerProperties.MONITORING_STATISTICS_MBEANS_ENABLED, true);
     cfg.property(ContextPropertyKeys.SERVER_CONTEXT.name(),
         new ServerContext(namespace.getMetadataStoreAddress(), namespace.isMultiZkEnabled(),
             namespace.getMsdsEndpoint()));
@@ -159,7 +167,21 @@ public class HelixRestServer {
 
     cfg.register(new CORSFilter());
     cfg.register(new AuditLogFilter(_auditLoggers));
+
     return cfg;
+  }
+
+  private void initMetricRegistry(ResourceConfig cfg, String namespace) {
+    MetricRegistry metricRegistry = new MetricRegistry();
+    cfg.register(new InstrumentedResourceMethodApplicationListener(metricRegistry));
+    SharedMetricRegistries.add(namespace, metricRegistry);
+
+    JmxReporter.forRegistry(metricRegistry)
+        .inDomain("org.apache.helix.rest:" + namespace)
+        .createsObjectNamesWith(new HelixRestObjectNameFactory())
+        .filter(MetricFilter.startsWith("org.apache.helix.rest"))
+        .build()
+        .start();
   }
 
   private void initServlet(ResourceConfig cfg, String servletPathSpec) {

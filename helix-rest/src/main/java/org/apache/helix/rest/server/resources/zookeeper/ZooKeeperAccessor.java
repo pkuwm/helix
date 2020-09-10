@@ -21,6 +21,7 @@ package org.apache.helix.rest.server.resources.zookeeper;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.PostConstruct;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -29,6 +30,13 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SharedMetricRegistries;
+import com.codahale.metrics.annotation.ExceptionMetered;
+import com.codahale.metrics.annotation.Metered;
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Enums;
 import com.google.common.collect.ImmutableMap;
 import org.apache.helix.AccessOption;
@@ -47,10 +55,13 @@ import org.slf4j.LoggerFactory;
  * ZooKeeperAccessor provides methods for accessing ZooKeeper resources (ZNodes).
  * It provides basic ZooKeeper features supported by ZkClient.
  */
+//@Timed
 @Path("/zookeeper{path: /.+}")
 public class ZooKeeperAccessor extends AbstractResource {
   private static final Logger LOG = LoggerFactory.getLogger(ZooKeeperAccessor.class.getName());
   private BaseDataAccessor<byte[]> _zkBaseDataAccessor;
+  private Counter counter;
+  private MetricRegistry _metricRegistry;
 
   public enum ZooKeeperCommand {
     exists,
@@ -60,8 +71,18 @@ public class ZooKeeperAccessor extends AbstractResource {
     getStat
   }
 
+  @PostConstruct
+  private void init() {
+    _metricRegistry = SharedMetricRegistries.getOrCreate(getNamespace());
+    counter = _metricRegistry.counter(MetricRegistry.name(ZooKeeperAccessor.class,  "exists-counter"));
+  }
+
+//  @Timed//(name = "get-counter")
+//  @Metered
+  @ResponseMetered
   @GET
   public Response get(@PathParam("path") String path, @QueryParam("command") String commandStr) {
+    System.out.println(getNamespace());
     ZooKeeperCommand cmd = getZooKeeperCommandIfPresent(commandStr);
     if (cmd == null) {
       return badRequest("Invalid ZooKeeper command: " + commandStr);
@@ -81,6 +102,8 @@ public class ZooKeeperAccessor extends AbstractResource {
 
     switch (cmd) {
       case exists:
+        counter.inc();
+        System.out.println(_metricRegistry.getTimers());
         return exists(_zkBaseDataAccessor, path);
       case getBinaryData:
         return getBinaryData(_zkBaseDataAccessor, path);

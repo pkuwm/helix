@@ -31,13 +31,19 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SharedMetricRegistries;
+import com.codahale.metrics.annotation.Timed;
 import org.apache.helix.HelixException;
+import org.apache.helix.rest.common.ContextPropertyKeys;
+import org.apache.helix.rest.common.HelixRestNamespace;
 import org.apache.helix.rest.server.auditlog.AuditLog;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Timed
 @Produces({MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN})
 @Consumes({MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN})
 public class AbstractResource {
@@ -177,5 +183,11 @@ public class AbstractResource {
     } catch (IllegalArgumentException ex) {
       throw new HelixException("Unknown command: " + commandStr);
     }
+  }
+
+  protected String getNamespace() {
+    HelixRestNamespace namespace =
+        (HelixRestNamespace) _application.getProperties().get(ContextPropertyKeys.METADATA.name());
+    return namespace.getName();
   }
 }
