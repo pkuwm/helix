@@ -19,12 +19,15 @@ package org.apache.helix.model.management;
  * under the License.
  */
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.base.Preconditions;
 import org.apache.helix.api.status.ClusterManagementMode;
 
 /**
  * Represents a request to set the cluster management mode {@link ClusterManagementMode}
  */
+@JsonDeserialize(builder = ClusterManagementModeRequest.Builder.class)
 public class ClusterManagementModeRequest {
   private final ClusterManagementMode.Type _mode;
   private final String _clusterName;
@@ -58,6 +61,7 @@ public class ClusterManagementModeRequest {
     return new Builder();
   }
 
+  @JsonPOJOBuilder(buildMethodName = "buildFromJson")
   public static final class Builder {
     private ClusterManagementMode.Type mode;
     private String clusterName;
@@ -85,7 +89,7 @@ public class ClusterManagementModeRequest {
      * @param cancelPendingST whether or not cancel pending ST for CLUSTER_PAUSE mode.
      * @return {@link Builder}
      */
-    public Builder cancelPendingST(boolean cancelPendingST) {
+    public Builder withCancelPendingST(boolean cancelPendingST) {
       this.cancelPendingST = cancelPendingST;
       return this;
     }
@@ -93,6 +97,12 @@ public class ClusterManagementModeRequest {
     public ClusterManagementModeRequest build() {
       validate();
       return new ClusterManagementModeRequest(this);
+    }
+
+    // Used by Json deserializer
+    private ClusterManagementModeRequest buildFromJson() {
+      Preconditions.checkNotNull(mode, "Mode not set");
+      return new ClusterManagementModeRequest((this));
     }
 
     private void validate() {

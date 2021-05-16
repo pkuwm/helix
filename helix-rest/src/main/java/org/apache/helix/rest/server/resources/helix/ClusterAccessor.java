@@ -36,6 +36,7 @@ import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -47,6 +48,7 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathBuilder;
+import org.apache.helix.api.exceptions.HelixConflictException;
 import org.apache.helix.manager.zk.ZKUtil;
 import org.apache.helix.model.CloudConfig;
 import org.apache.helix.model.ClusterConfig;
@@ -59,6 +61,7 @@ import org.apache.helix.model.Message;
 import org.apache.helix.model.RESTConfig;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.model.management.ClusterManagementModeRequest;
 import org.apache.helix.rest.common.HttpConstants;
 import org.apache.helix.rest.server.json.cluster.ClusterTopology;
 import org.apache.helix.rest.server.service.ClusterService;
@@ -295,6 +298,40 @@ public class ClusterAccessor extends AbstractHelixResource {
     }
 
     return OK();
+  }
+
+  @ResponseMetered(name = HttpConstants.WRITE_REQUEST)
+  @Timed(name = HttpConstants.WRITE_REQUEST)
+  @PUT
+  @Path("{clusterId}/management-mode")
+  public Response updateClusterManagementMode(@PathParam("clusterId") String clusterId,
+      @DefaultValue("{}") String content) {
+    ClusterManagementModeRequest request;
+    try {
+      request = OBJECT_MAPPER.readerFor(ClusterManagementModeRequest.class).readValue(content);
+    } catch (JsonProcessingException e) {
+      LOG.warn("Failed to parse json string: {}", content, e);
+      return badRequest("Invalid payload json body: " + content);
+    }
+
+    // Need to add cluster name
+    request = ClusterManagementModeRequest.newBuilder()
+        .withClusterName(clusterId)
+        .withMode(request.getMode())
+        .withCancelPendingST(request.isCancelPendingST())
+        .withReason(request.getReason())
+        .build();
+
+    try {
+      getHelixAdmin().setClusterManagementMode(request);
+    } catch (HelixConflictException e) {
+      return Response.status(Response.Status.CONFLICT)
+          .entity(ImmutableMap.of("error", e.getMessage())).build();
+    } catch (HelixException e) {
+      return Response.serverError().entity(ImmutableMap.of("error", e.getMessage())).build();
+    }
+
+    return Response.ok(ImmutableMap.of("acknowledged", true)).build();
   }
 
   @ResponseMetered(name = HttpConstants.READ_REQUEST)

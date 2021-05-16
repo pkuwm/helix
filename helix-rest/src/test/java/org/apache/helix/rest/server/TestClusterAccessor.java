@@ -32,23 +32,23 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.sun.research.ws.wadl.HTTPMethods;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.TestHelper;
+import org.apache.helix.api.status.ClusterManagementMode;
 import org.apache.helix.cloud.azure.AzureConstants;
 import org.apache.helix.cloud.constants.CloudProvider;
-import org.apache.helix.controller.rebalancer.DelayedAutoRebalancer;
-import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.controller.rebalancer.waged.WagedRebalancer;
 import org.apache.helix.integration.manager.ClusterDistributedController;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZKUtil;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.CloudConfig;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.CustomizedStateConfig;
@@ -57,7 +57,9 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.MaintenanceSignal;
+import org.apache.helix.model.PauseSignal;
 import org.apache.helix.model.RESTConfig;
+import org.apache.helix.model.management.ClusterManagementModeRequest;
 import org.apache.helix.rest.common.HelixRestNamespace;
 import org.apache.helix.rest.server.auditlog.AuditLog;
 import org.apache.helix.rest.server.resources.AbstractResource;
@@ -1286,6 +1288,43 @@ public class TestClusterAccessor extends AbstractTestClass {
     Assert.assertEquals(listTypesFromZk.get(0), "mockType2");
     Assert.assertFalse(listTypesFromZk.contains("mockType1"));
     System.out.println("End test :" + TestHelper.getTestMethodName());
+  }
+
+  @Test
+  public void testUpdateClusterManagementMode() throws JsonProcessingException {
+    String cluster = _clusters.iterator().next();
+    HelixDataAccessor dataAccessor =
+        new ZKHelixDataAccessor(cluster, new ZkBaseDataAccessor<>(_gZkClient));
+    // Pause not existed
+    Assert.assertNull(dataAccessor.getProperty(dataAccessor.keyBuilder().pause()));
+
+    // Set cluster pause mode
+    ClusterManagementModeRequest request = ClusterManagementModeRequest.newBuilder()
+        .withMode(ClusterManagementMode.Type.CLUSTER_PAUSE)
+        .withClusterName(cluster)
+        .build();
+    String payload = OBJECT_MAPPER.writeValueAsString(request);
+    String endpoint = "clusters/" + cluster + "/management-mode";
+    put(endpoint, null, Entity.entity(payload, MediaType.APPLICATION_JSON_TYPE),
+        Response.Status.OK.getStatusCode());
+
+    PauseSignal pauseSignal = dataAccessor.getProperty(dataAccessor.keyBuilder().pause());
+    Assert.assertNotNull(pauseSignal);
+    Assert.assertTrue(pauseSignal.isClusterPause());
+    Assert.assertFalse(pauseSignal.getCancelPendingST());
+
+    // set normal mode
+    request = ClusterManagementModeRequest.newBuilder()
+        .withMode(ClusterManagementMode.Type.CLUSTER_PAUSE)
+        .withClusterName(cluster)
+        .build();
+    payload = OBJECT_MAPPER.writeValueAsString(request);
+    put(endpoint, null, Entity.entity(payload, MediaType.APPLICATION_JSON_TYPE),
+        Response.Status.OK.getStatusCode());
+
+    // Pause signal is deleted
+    pauseSignal = dataAccessor.getProperty(dataAccessor.keyBuilder().pause());
+    Assert.assertNull(pauseSignal);
   }
 
   private ClusterConfig getClusterConfigFromRest(String cluster) throws IOException {
