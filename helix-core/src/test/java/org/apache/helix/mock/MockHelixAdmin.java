@@ -44,7 +44,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MaintenanceSignal;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
-import org.apache.helix.model.management.ClusterManagementMode;
+import org.apache.helix.api.status.ClusterManagementMode;
 import org.apache.helix.model.management.ClusterManagementModeRequest;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
@@ -330,11 +330,6 @@ public class MockHelixAdmin implements HelixAdmin {
   @Override
   public void setClusterManagementMode(ClusterManagementModeRequest request) {
 
-  }
-
-  @Override
-  public ClusterManagementMode getClusterManagementMode(String clusterName) {
-    return null;
   }
 
   @Override public void resetPartition(String clusterName, String instanceName, String resourceName,

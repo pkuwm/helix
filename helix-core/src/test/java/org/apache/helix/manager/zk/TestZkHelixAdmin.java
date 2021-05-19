@@ -71,7 +71,7 @@ import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.ConstraintItemBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.helix.model.management.ClusterManagementMode;
+import org.apache.helix.api.status.ClusterManagementMode;
 import org.apache.helix.model.management.ClusterManagementModeRequest;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.tools.StateModelConfigGenerator;
@@ -1093,7 +1093,7 @@ public class TestZkHelixAdmin extends ZkUnitTestBase {
 
       // Verify pause signal is correctly written
       Assert.assertNotNull(pauseSignal);
-      Assert.assertEquals(pauseSignal.getPauseCluster(), Boolean.toString(true));
+      Assert.assertTrue(pauseSignal.isClusterPause());
       Assert.assertFalse(pauseSignal.getCancelPendingST());
       Assert.assertEquals(pauseSignal.getFromHost(), NetworkUtil.getLocalhostName());
       Assert.assertEquals(pauseSignal.getReason(), methodName);

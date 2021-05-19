@@ -80,7 +80,7 @@ import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.PauseSignal;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
-import org.apache.helix.model.management.ClusterManagementMode;
+import org.apache.helix.api.status.ClusterManagementMode;
 import org.apache.helix.model.management.ClusterManagementModeRequest;
 import org.apache.helix.msdcommon.exception.InvalidRoutingDataException;
 import org.apache.helix.tools.DefaultIdealStateCalculator;
@@ -538,13 +538,14 @@ public class ZKHelixAdmin implements HelixAdmin {
     }
 
     PauseSignal pauseSignal = new PauseSignal();
-    pauseSignal.setPauseCluster(Boolean.toString(true));
+    pauseSignal.setClusterPause(true);
     pauseSignal.setCancelPendingST(cancelPendingST);
     pauseSignal.setFromHost(hostname);
-    pauseSignal.setTriggerTime(Instant.now().toString());
+    pauseSignal.setTriggerTime(Instant.now().toEpochMilli());
     if (reason != null && !reason.isEmpty()) {
       pauseSignal.setReason(reason);
     }
+    // TODO: merge management status signal into one znode to avoid race condition
     if (!accessor.createPause(pauseSignal)) {
       throw new HelixException("Failed to create pause signal");
     }
@@ -556,19 +557,13 @@ public class ZKHelixAdmin implements HelixAdmin {
         new ZKHelixDataAccessor(clusterName, new ZkBaseDataAccessor<>(_zkClient));
     PropertyKey pausePropertyKey = accessor.keyBuilder().pause();
     PauseSignal pauseSignal = accessor.getProperty(pausePropertyKey);
-    if (pauseSignal == null || pauseSignal.getPauseCluster() == null) {
+    if (pauseSignal == null || !pauseSignal.isClusterPause()) {
       throw new HelixException("Cluster pause mode is not enabled for cluster " + clusterName);
     }
 
     if (!accessor.removeProperty(pausePropertyKey)) {
       throw new HelixException("Failed to disable cluster pause mode for cluster: " + clusterName);
     }
-  }
-
-  @Override
-  public ClusterManagementMode getClusterManagementMode(String clusterName) {
-    // TODO: implement logic
-    return null;
   }
 
   @Override

@@ -20,6 +20,7 @@ package org.apache.helix.model.management;
  */
 
 import com.google.common.base.Preconditions;
+import org.apache.helix.api.status.ClusterManagementMode;
 
 /**
  * Represents a request to set the cluster management mode {@link ClusterManagementMode}
