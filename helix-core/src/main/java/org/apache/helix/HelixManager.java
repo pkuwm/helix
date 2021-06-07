@@ -46,6 +46,7 @@ import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.CustomizedStateConfig;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.participant.HelixStateMachineEngine;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.spectator.RoutingTableProvider;
@@ -478,6 +479,14 @@ public interface HelixManager {
    * @param liveInstanceInfoProvider
    */
   void setLiveInstanceInfoProvider(LiveInstanceInfoProvider liveInstanceInfoProvider);
+
+  default void changeLiveInstanceStatus(LiveInstance.LiveInstanceStatus status) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  default LiveInstance.LiveInstanceStatus getLiveInstanceStatus() {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 
   /**
    * Participant only component that periodically update participant health

@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.JMException;
 
 import com.google.common.collect.Sets;
+import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.ConfigAccessor;
@@ -144,6 +145,10 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
   private ConfigAccessor _configAccessor;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   protected LiveInstanceInfoProvider _liveInstanceInfoProvider = null;
+
+  // participant freeze fields
+  private LiveInstance.LiveInstanceStatus _liveInstanceStatus;
+  private String _freezeSessionId;
 
   private volatile String _sessionId;
 
@@ -1107,6 +1112,38 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
     _liveInstanceInfoProvider = liveInstanceInfoProvider;
   }
 
+  @Override
+  public void changeLiveInstanceStatus(LiveInstance.LiveInstanceStatus status) {
+    if (LiveInstance.LiveInstanceStatus.PAUSED.equals(status)) {
+      updateLiveInstanceStatusInZk(status);
+      _freezeSessionId = _sessionId;
+      _liveInstanceStatus = LiveInstance.LiveInstanceStatus.PAUSED;
+    } else if (LiveInstance.LiveInstanceStatus.NORMAL.equals(status)) {
+      _participantManager =
+          new ParticipantManager(this, _zkclient, _sessionTimeout, _liveInstanceInfoProvider,
+              _preConnectCallbacks, _sessionId, _helixManagerProperty);
+      _participantManager.carryOverPreviousCurrentState();
+
+      updateLiveInstanceStatusInZk(status);
+      _freezeSessionId = null;
+      _liveInstanceStatus = null;
+    }
+  }
+
+  @Override
+  public LiveInstance.LiveInstanceStatus getLiveInstanceStatus() {
+    return _liveInstanceStatus;
+  }
+
+  private void updateLiveInstanceStatusInZk(LiveInstance.LiveInstanceStatus status) {
+    PropertyKey key = _keyBuilder.liveInstance(_instanceName);
+    _dataAccessor.getBaseDataAccessor().update(key.getPath(), oldRecord -> {
+      LiveInstance liveInstance = new LiveInstance(oldRecord);
+      liveInstance.setStatus(status);
+      return liveInstance.getRecord();
+    }, AccessOption.EPHEMERAL);
+  }
+
   /**
    * wait until we get a non-zero session-id. note that we might lose zkconnection
    * right after we read session-id. but it's ok to get stale session-id and we will have
@@ -1317,6 +1354,13 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
     LOG.info("Handle new session, instance: {}, type: {}, session id: {}.", _instanceName,
         _instanceType,  sessionId);
 
+    // Will only create live instance
+    if (LiveInstance.LiveInstanceStatus.PAUSED.equals(_liveInstanceStatus)) {
+      LOG.info("Skip reset because instance is in {} status", _liveInstanceStatus);
+      handleNewSessionInManagementMode(sessionId);
+      return;
+    }
+
     /**
      * stop all timer tasks, reset all handlers, make sure cleanup completed for previous session
      * disconnect if fail to cleanup
@@ -1373,6 +1417,21 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
       } catch (Exception e) {
         LOG.warn("stateListener.onConnected callback fails", e);
       }
+    }
+  }
+
+  private void handleNewSessionInManagementMode(String sessionId) throws Exception {
+    if (_instanceType.equals(InstanceType.PARTICIPANT)) {
+      LiveInstanceInfoProvider provider = () -> {
+        ZNRecord record = new ZNRecord("STATUS_PROVIDER");
+        record.setSimpleField(LiveInstance.LiveInstanceProperty.STATUS.name(),
+            _liveInstanceStatus.name());
+        return record;
+      };
+      _participantManager =
+          new ParticipantManager(this, _zkclient, _sessionTimeout, provider, _preConnectCallbacks,
+              sessionId, _helixManagerProperty);
+      _participantManager.handleNewSession();
     }
   }
 

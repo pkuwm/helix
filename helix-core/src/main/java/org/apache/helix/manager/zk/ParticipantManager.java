@@ -153,12 +153,29 @@ public class ParticipantManager {
     // Live instance creation also checks if the expected session is valid or not. Live instance
     // should not be created by an expired zk session.
     createLiveInstance();
-    carryOverPreviousCurrentState();
+
+    if (shouldCarryOverPreviousCurrentState()) {
+      carryOverPreviousCurrentState();
+    }
 
     /**
      * setup message listener
      */
     setupMsgHandler();
+  }
+
+  private boolean shouldCarryOverPreviousCurrentState() {
+    if (_liveInstanceInfoProvider == null) {
+      return true;
+    }
+    ZNRecord additionalLiveInstanceInfo = _liveInstanceInfoProvider.getAdditionalLiveInstanceInfo();
+    String status = null;
+    if (additionalLiveInstanceInfo != null) {
+      status = additionalLiveInstanceInfo
+          .getSimpleField(LiveInstance.LiveInstanceProperty.STATUS.name());
+    }
+    // Should not carry current state if instance meant to be frozen.
+    return !LiveInstance.LiveInstanceStatus.PAUSED.name().equalsIgnoreCase(status);
   }
 
   private void joinCluster() {
@@ -338,7 +355,7 @@ public class ParticipantManager {
    * carry over current-states from last sessions
    * set to initial state for current session only when state doesn't exist in current session
    */
-  private void carryOverPreviousCurrentState() {
+  void carryOverPreviousCurrentState() {
     List<String> sessions = _dataAccessor.getChildNames(_keyBuilder.sessions(_instanceName));
 
     for (String session : sessions) {

@@ -40,6 +40,7 @@ import org.apache.helix.messaging.handling.HelixStateTransitionHandler;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.TaskExecutor;
 import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.Message.MessageType;
 import org.apache.helix.model.StateModelDefinition;
@@ -152,14 +153,20 @@ public class HelixStateMachineEngine implements StateMachineEngine {
       for (StateModelFactory<? extends StateModel> stateModelFactory : ftyMap.values()) {
         for (String resourceName : stateModelFactory.getResourceSet()) {
           for (String partitionKey : stateModelFactory.getPartitionSet(resourceName)) {
-            logger.info("Resetting {}::{}", resourceName, partitionKey);
             StateModel stateModel = stateModelFactory.getStateModel(resourceName, partitionKey);
             if (stateModel != null) {
-              stateModel.reset();
-              String initialState = _stateModelParser.getInitialState(stateModel.getClass());
-              stateModel.updateState(initialState);
-              // TODO probably should update the state on ZK. Shi confirm what needs
-              // to be done here.
+              // Sync state when exiting from FREEZE mode
+              if (LiveInstance.LiveInstanceStatus.PAUSED.equals(_manager.getLiveInstanceStatus())) {
+                logger.info("Sync state for {}::{}", resourceName, partitionKey);
+                stateModel.syncState();
+              } else {
+                logger.info("Resetting {}::{}", resourceName, partitionKey);
+                stateModel.reset();
+                String initialState = _stateModelParser.getInitialState(stateModel.getClass());
+                stateModel.updateState(initialState);
+                // TODO probably should update the state on ZK. Shi confirm what needs
+                // to be done here.
+              }
             } else {
               // TODO: If stateModel is null, we might need to do something here
               // This reset() is not synchronized. We observed that during a shutdown (where

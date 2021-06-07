@@ -127,6 +127,7 @@ public class HelixTaskExecutor implements MessageListener, TaskExecutor {
   private MessageQueueMonitor _messageQueueMonitor;
   private GenericHelixController _controller;
   private Long _lastSessionSyncTime;
+  private String _freezeSessionId;
   private static final int SESSION_SYNC_INTERVAL = 2000; // 2 seconds
   private static final String SESSION_SYNC = "SESSION-SYNC";
   /**
@@ -630,6 +631,20 @@ public class HelixTaskExecutor implements MessageListener, TaskExecutor {
             + ", pool: " + pool);
   }
 
+  private void syncState() {
+    for (Map.Entry<String, MsgHandlerFactoryRegistryItem> entry : _hdlrFtyRegistry.entrySet()) {
+      MsgHandlerFactoryRegistryItem item = entry.getValue();
+      if (item.factory() != null) {
+        try {
+          item.factory().reset();
+        } catch (Exception ex) {
+          LOG.error("Failed to reset the factory {} of message type {}.", item.factory(),
+              entry.getKey(), ex);
+        }
+      }
+    }
+  }
+
   void reset() {
     LOG.info("Reset HelixTaskExecutor");
 
@@ -1067,6 +1082,22 @@ public class HelixTaskExecutor implements MessageListener, TaskExecutor {
         if (success) {
           return true;
         }
+      }
+
+      if (MessageType.PARTICIPANT_STATUS_CHANGE.name().equals(message.getMsgType())) {
+        LiveInstance.LiveInstanceStatus toStatus = message.getToStatus();
+        if (LiveInstance.LiveInstanceStatus.PAUSED.equals(toStatus)) {
+          _freezeSessionId = manager.getSessionId();
+        } else if (LiveInstance.LiveInstanceStatus.NORMAL.equals(toStatus)) {
+          // session changed, should call state model syncState()
+          if (_freezeSessionId != null && !_freezeSessionId.equals(manager.getSessionId())) {
+            syncState();
+          }
+          _freezeSessionId = null;
+        }
+        manager.changeLiveInstanceStatus(toStatus);
+        reportAndRemoveMessage(message, accessor, instanceName, ProcessedMessageState.COMPLETED);
+        return true;
       }
 
       _monitor.reportReceivedMessage(message);

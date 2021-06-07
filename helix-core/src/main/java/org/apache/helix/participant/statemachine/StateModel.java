@@ -37,6 +37,11 @@ public abstract class StateModel {
     return _currentState;
   }
 
+  //
+  public void syncState() {
+    logger.warn("Default syncState method invoked.");
+  }
+
   // @transition(from='from', to='to')
   public void defaultTransitionHandler() {
     logger
