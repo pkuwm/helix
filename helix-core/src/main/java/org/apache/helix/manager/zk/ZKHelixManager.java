@@ -1386,16 +1386,13 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
 
   private void handleNewSessionInManagementMode(String sessionId) throws Exception {
     LOG.info("Skip reset because instance is in {} status", LiveInstance.LiveInstanceStatus.PAUSED);
-    if (!InstanceType.PARTICIPANT.equals(_instanceType)) {
+    if (!InstanceType.PARTICIPANT.equals(_instanceType)
+        && !InstanceType.CONTROLLER_PARTICIPANT.equals(_instanceType)) {
       return;
     }
     // Add STATUS to info provider so the new live instance will have STATUS field
-    LiveInstanceInfoProvider provider = () -> {
-      ZNRecord record = new ZNRecord("STATUS_PROVIDER");
-      record.setEnumField(LiveInstance.LiveInstanceProperty.STATUS.name(), _liveInstanceStatus);
-      return record;
-    };
-    handleNewSessionAsParticipant(sessionId, provider);
+    handleNewSessionAsParticipant(sessionId,
+        new LiveInstanceStatusInfoProvider(_liveInstanceStatus));
   }
 
   void handleNewSessionAsParticipant(final String sessionId, LiveInstanceInfoProvider provider)
@@ -1557,5 +1554,22 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
       zkConnectionInfo = _zkAddress;
     }
     return zkConnectionInfo;
+  }
+
+  /*
+   * Provides live instance status as additional live instance info in the info provider.
+   */
+  private static class LiveInstanceStatusInfoProvider implements LiveInstanceInfoProvider {
+    private final ZNRecord _record;
+
+    public LiveInstanceStatusInfoProvider(LiveInstance.LiveInstanceStatus status) {
+      _record = new ZNRecord("STATUS_PROVIDER");
+      _record.setEnumField(LiveInstance.LiveInstanceProperty.STATUS.name(), status);
+    }
+
+    @Override
+    public ZNRecord getAdditionalLiveInstanceInfo() {
+      return _record;
+    }
   }
 }
